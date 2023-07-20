@@ -3,6 +3,7 @@ package znet
 import (
 	"fmt"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -37,7 +38,7 @@ func (conn *Connection) StartReader() {
 	defer fmt.Println("connId = ", conn.ConnId, "Reader is exit, remote addr is ,", conn.GetRemoteAddr().String())
 	defer conn.Stop()
 	for {
-		buf := make([]byte, 1024)
+		buf := make([]byte, utils.GlobalObject.MaxPacketSize)
 		_, err := conn.Conn.Read(buf)
 		if err != nil {
 			fmt.Println("conn Read error: ", err)
