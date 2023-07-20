@@ -20,6 +20,8 @@ type Connection struct {
 	ExitChan chan bool
 	//The current server message management module is used to bind msgID and the corresponding processing business API relationship
 	MsgHandler ziface.IMsgHandler
+	//Unbuffered channel for message communication between reads and writes, goroutines
+	MsgChan chan []byte
 }
 
 // NewConnection 初始化链接模块的方法
@@ -30,13 +32,14 @@ func NewConnection(conn *net.TCPConn, connId uint32, msgHandler ziface.IMsgHandl
 		ConnStatus: false,
 		MsgHandler: msgHandler,
 		ExitChan:   make(chan bool, 1),
+		MsgChan:    make(chan []byte),
 	}
 }
 
 // StartReader 链接的读业务方法
 func (conn *Connection) StartReader() {
-	fmt.Println("Reader Goroutine is running")
-	defer fmt.Println("connId = ", conn.ConnId, "Reader is exit, remote addr is ,", conn.GetRemoteAddr().String())
+	fmt.Println("[Reader Goroutine is running]")
+	defer fmt.Println("connId = ", conn.ConnId, "[Reader is exit], remote addr is ,", conn.GetRemoteAddr().String())
 	defer conn.Stop()
 	for {
 		//buf := make([]byte, utils.GlobalObject.MaxPacketSize)
@@ -94,6 +97,25 @@ func (conn *Connection) StartReader() {
 	}
 }
 
+//StartWriter The linked write business method, which is used to send data to the client
+func (conn *Connection) StartWriter() {
+	fmt.Println("[Writer Goroutine is running]")
+	defer fmt.Println("connId = ", conn.ConnId, "[Writer is exit], remote addr is,", conn.GetRemoteAddr().String())
+	for {
+		select {
+		case data := <-conn.MsgChan:
+			//have data to send to client
+			if _, err := conn.Conn.Write(data); err != nil {
+				fmt.Println("Send data error: ", err)
+				return
+			}
+		case <-conn.ExitChan:
+			//reader have exit so writer need exit
+			return
+		}
+	}
+}
+
 //SendMsg :pack the msg which will be sent to client
 func (conn *Connection) SendMsg(msgId uint32, data []byte) error {
 	if conn.ConnStatus == true {
@@ -108,10 +130,12 @@ func (conn *Connection) SendMsg(msgId uint32, data []byte) error {
 		return errors.New("Pack Error msg")
 	}
 	//msgData -> client
-	if _, err := conn.Conn.Write(binMsg); err != nil {
-		fmt.Println("Write msg id = ", msgId, " error: ", err)
-		return errors.New("conn Write error")
-	}
+	conn.MsgChan <- binMsg
+
+	//if _, err := conn.Conn.Write(binMsg); err != nil {
+	//	fmt.Println("Write msg id = ", msgId, " error: ", err)
+	//	return errors.New("conn Write error")
+	//}
 	return nil
 }
 
@@ -119,9 +143,9 @@ func (conn *Connection) SendMsg(msgId uint32, data []byte) error {
 func (conn *Connection) Start() {
 	fmt.Println("conn started ... connId:", conn.ConnId)
 	//启动当前链接的读数据业务
-	conn.StartReader()
+	go conn.StartReader()
 	//TODO: 启动当前链接的写数据业务
-
+	go conn.StartWriter()
 }
 func (conn *Connection) Stop() {
 	fmt.Println("conn stop() .. ConnId: ", conn.ConnId)
@@ -131,8 +155,11 @@ func (conn *Connection) Stop() {
 	conn.ConnStatus = true
 	//关闭链接
 	conn.Conn.Close()
+	//send Writer exit
+	conn.ExitChan <- true
 	//关闭管道
 	close(conn.ExitChan)
+	close(conn.MsgChan)
 }
 func (conn *Connection) GetTcpConnection() *net.TCPConn {
 	return conn.Conn
