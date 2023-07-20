@@ -16,7 +16,6 @@ func main() {
 		fmt.Println("client start error: ", err)
 		return
 	}
-	defer conn.Close()
 	for {
 		//链接调用write写数据
 		_, err := conn.Write([]byte("Hello Zinx V0.1"))

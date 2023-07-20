@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"zinx/ziface"
@@ -17,6 +18,16 @@ type Server struct {
 	Port int
 }
 
+//CallBackToClient 定义当前客户端链接所绑定的handle api (目前是写死的，后期应该优化有用户自定的handle方法)
+func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
+	//回显业务
+	fmt.Println("[Conn Handle] CallbackToClient...")
+	if _, err := conn.Write(data[:cnt]); err != nil {
+		fmt.Println("write back buf error", err)
+		return errors.New("CallBackToClient error")
+	}
+	return nil
+}
 func NewServer(name string) ziface.IServer {
 	return &Server{
 		Name:      name,
@@ -26,7 +37,7 @@ func NewServer(name string) ziface.IServer {
 	}
 }
 func (s *Server) Start() {
-	fmt.Println("[start] Server Listener at Ip :", s.IP+", port :", s.Port, "is starting")
+	fmt.Println("[start] Server Listener at Ip :", s.IP+", port :", s.Port, "is starti ng")
 	go func() {
 		//获取一个TCP的Addr
 		addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
@@ -40,6 +51,8 @@ func (s *Server) Start() {
 			fmt.Println("listen tcp error :", err)
 			return
 		}
+		var connId uint32
+		connId = 0
 		fmt.Println("start Zinx server success,", s.Name, "success,listening ...")
 		//循环监听
 		for {
@@ -49,23 +62,11 @@ func (s *Server) Start() {
 				fmt.Println("accept tcp error :", err)
 				continue
 			}
-			//已经与客户端建立链接，做一些业务，最大512字节长度的回显业务
-			go func() {
-				for {
-					buf := make([]byte, 1024)
-					n, err := conn.Read(buf)
-					if err != nil {
-						fmt.Println("read tcp error :", err)
-						continue
-					}
-					fmt.Printf("receive client buf %s , cnt = %d\n", buf, n)
-					//回显功能
-					if _, err := conn.Write(buf[:n]); err != nil {
-						fmt.Println("write back buf error :", err)
-						continue
-					}
-				}
-			}()
+			//绑定链接和业务，得到连接模块
+			dealConn := NewConnection(conn, connId, CallBackToClient)
+			connId++
+			//启动当前链接处理业务
+			go dealConn.Start()
 		}
 
 	}()
