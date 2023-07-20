@@ -18,17 +18,17 @@ type Connection struct {
 	ConnStatus bool
 	//等待连接被动退出的channel
 	ExitChan chan bool
-	//该链接处理的方法router
-	Router ziface.IRouter
+	//The current server message management module is used to bind msgID and the corresponding processing business API relationship
+	MsgHandler ziface.IMsgHandler
 }
 
 // NewConnection 初始化链接模块的方法
-func NewConnection(conn *net.TCPConn, connId uint32, router ziface.IRouter) *Connection {
+func NewConnection(conn *net.TCPConn, connId uint32, msgHandler ziface.IMsgHandler) *Connection {
 	return &Connection{
 		Conn:       conn,
 		ConnId:     connId,
 		ConnStatus: false,
-		Router:     router,
+		MsgHandler: msgHandler,
 		ExitChan:   make(chan bool, 1),
 	}
 }
@@ -77,12 +77,16 @@ func (conn *Connection) StartReader() {
 		}
 
 		//执行注册的路由方法
-		go func(req ziface.IRequest) {
-			conn.Router.PreHandle(req)
-			conn.Router.Handle(req)
-			conn.Router.PostHandle(req)
-		}(&req)
-		////调用当前链接绑定的HandleApi
+		//go func(req ziface.IRequest) {
+		//	conn.Router.PreHandle(req)
+		//	conn.Router.Handle(req)
+		//	conn.Router.PostHandle(req)
+		//}(&req)
+
+		//Call the HandleHandle API of the current link binding
+		//Find the corresponding processing business execution according to the bound msgId
+		go conn.MsgHandler.DoMsgHandler(&req)
+
 		//if err := conn.HandleApi(conn.Conn, buf, n); err != nil {
 		//	fmt.Println("connId ", conn.ConnId, "HandleApi error: ", err)
 		//	break

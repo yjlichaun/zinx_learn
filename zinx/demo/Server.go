@@ -10,6 +10,9 @@ import (
 type PingRouter struct {
 	znet.BaseRouter
 }
+type HelloZinxRouter struct {
+	znet.BaseRouter
+}
 
 //func (p *PingRouter) PreHandle(req ziface.IRequest) {
 //	fmt.Println("Call Router PreHandle...")
@@ -20,10 +23,19 @@ type PingRouter struct {
 //}
 
 func (p *PingRouter) Handle(req ziface.IRequest) {
-	fmt.Println("Call Router Handle...")
+	fmt.Println("Call PingRouter Handle...")
 	//read client data ,write ping...
 	fmt.Println("recv from client :msgId = ", req.GetMsgId(), ", data = ", string(req.GetData()))
-	err := req.GetConnection().SendMsg(1, []byte("ping...\n"))
+	err := req.GetConnection().SendMsg(200, []byte("ping...\n"))
+	if err != nil {
+		fmt.Println("call back ping error", err)
+	}
+}
+func (p *HelloZinxRouter) Handle(req ziface.IRequest) {
+	fmt.Println("Call HelloZinxRouter Handle...")
+	//read client data ,write ping...
+	fmt.Println("recv from client :msgId = ", req.GetMsgId(), ", data = ", string(req.GetData()))
+	err := req.GetConnection().SendMsg(201, []byte("hello...\n"))
 	if err != nil {
 		fmt.Println("call back ping error", err)
 	}
@@ -41,6 +53,7 @@ func (p *PingRouter) Handle(req ziface.IRequest) {
 func main() {
 	z := znet.NewServer("[demoServer]")
 	//给当前框架添加router
-	z.AddRouter(&PingRouter{})
+	z.AddRouter(0, &PingRouter{})
+	z.AddRouter(1, &HelloZinxRouter{})
 	z.Serve()
 }

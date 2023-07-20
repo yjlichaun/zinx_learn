@@ -16,8 +16,8 @@ type Server struct {
 	IP string
 	//服务监听的端口
 	Port int
-	//当前server添加router server注册的链接对应的处理业务
-	Router ziface.IRouter
+	//The current server message management module is used to bind msgID and the corresponding processing business API relationship
+	MsgHandler ziface.IMsgHandler
 }
 
 //CallBackToClient 定义当前客户端链接所绑定的handle api (目前是写死的，后期应该优化有用户自定的handle方法)
@@ -32,11 +32,11 @@ type Server struct {
 //}
 func NewServer(name string) ziface.IServer {
 	return &Server{
-		Name:      utils.GlobalObject.Name,
-		IPVersion: "tcp4",
-		IP:        utils.GlobalObject.Host,
-		Port:      utils.GlobalObject.TcpPort,
-		Router:    nil,
+		Name:       utils.GlobalObject.Name,
+		IPVersion:  "tcp4",
+		IP:         utils.GlobalObject.Host,
+		Port:       utils.GlobalObject.TcpPort,
+		MsgHandler: NewMsgHandler(),
 	}
 }
 func (s *Server) Start() {
@@ -72,7 +72,7 @@ func (s *Server) Start() {
 				continue
 			}
 			//绑定链接和业务，得到连接模块
-			dealConn := NewConnection(conn, connId, s.Router)
+			dealConn := NewConnection(conn, connId, s.MsgHandler)
 			connId++
 			//启动当前链接处理业务
 			go dealConn.Start()
@@ -93,8 +93,8 @@ func (s *Server) Serve() {
 	select {}
 }
 
-//AddRouter 添加一个路由
-func (s *Server) AddRouter(route ziface.IRouter) {
-	s.Router = route
+//AddRouter add a router to the server
+func (s *Server) AddRouter(msgId uint32, route ziface.IRouter) {
+	s.MsgHandler.AddRouter(msgId, route)
 	fmt.Println("add router success !!!")
 }
