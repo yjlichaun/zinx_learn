@@ -11,29 +11,32 @@ type PingRouter struct {
 	znet.BaseRouter
 }
 
-func (p *PingRouter) PreHandle(req ziface.IRequest) {
-	fmt.Println("Call Router PreHandle...")
-	_, err := req.GetConnection().GetTcpConnection().Write([]byte("before ping..."))
-	if err != nil {
-		fmt.Println("call back before ping error", err)
-	}
-}
+//func (p *PingRouter) PreHandle(req ziface.IRequest) {
+//	fmt.Println("Call Router PreHandle...")
+//	_, err := req.GetConnection().GetTcpConnection().Write([]byte("before ping... \n"))
+//	if err != nil {
+//		fmt.Println("call back before ping error", err)
+//	}
+//}
 
 func (p *PingRouter) Handle(req ziface.IRequest) {
 	fmt.Println("Call Router Handle...")
-	_, err := req.GetConnection().GetTcpConnection().Write([]byte("ping..."))
+	//read client data ,write ping...
+	fmt.Println("recv from client :msgId = ", req.GetMsgId(), ", data = ", string(req.GetData()))
+	err := req.GetConnection().SendMsg(1, []byte("ping...\n"))
 	if err != nil {
 		fmt.Println("call back ping error", err)
 	}
+
 }
 
-func (p *PingRouter) PostHandle(req ziface.IRequest) {
-	fmt.Println("Call Router PostHandle...")
-	_, err := req.GetConnection().GetTcpConnection().Write([]byte("After ping..."))
-	if err != nil {
-		fmt.Println("call back after ping error", err)
-	}
-}
+//func (p *PingRouter) PostHandle(req ziface.IRequest) {
+//	fmt.Println("Call Router PostHandle...")
+//	_, err := req.GetConnection().GetTcpConnection().Write([]byte("After ping... \n"))
+//	if err != nil {
+//		fmt.Println("call back after ping error", err)
+//	}
+//}
 
 func main() {
 	z := znet.NewServer("[demoServer]")

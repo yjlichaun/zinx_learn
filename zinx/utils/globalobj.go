@@ -24,7 +24,7 @@ var GlobalObject *GlobalObj
 
 //Reload 从配置文件加载全局对象
 func (g *GlobalObj) Reload() {
-	data, err := ioutil.ReadFile("conf/zinx.json")
+	data, err := ioutil.ReadFile("E:/golang/zinx/conf/zinx.json")
 	if err != nil {
 		panic(err)
 	}
