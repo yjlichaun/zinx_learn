@@ -48,6 +48,8 @@ func (s *Server) Start() {
 	)
 	fmt.Println("[start] Server Listener at Ip :", s.IP+", port :", s.Port, "is starting")
 	go func() {
+		//open WorkerPool
+		s.MsgHandler.StartWorkerPool()
 		//获取一个TCP的Addr
 		addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {

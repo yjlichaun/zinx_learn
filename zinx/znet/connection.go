@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -39,7 +40,7 @@ func NewConnection(conn *net.TCPConn, connId uint32, msgHandler ziface.IMsgHandl
 // StartReader 链接的读业务方法
 func (conn *Connection) StartReader() {
 	fmt.Println("[Reader Goroutine is running]")
-	defer fmt.Println("connId = ", conn.ConnId, "[Reader is exit], remote addr is ,", conn.GetRemoteAddr().String())
+	defer fmt.Println("connId = ", conn.ConnId, "[Reader is exit]  , remote addr is ,", conn.GetRemoteAddr().String())
 	defer conn.Stop()
 	for {
 		//buf := make([]byte, utils.GlobalObject.MaxPacketSize)
@@ -78,7 +79,11 @@ func (conn *Connection) StartReader() {
 			conn: conn,
 			msg:  msg,
 		}
-
+		if utils.GlobalObject.WorkerPoolSize > 0 {
+			conn.MsgHandler.SendMsgToTaskQueue(&req)
+		} else {
+			go conn.MsgHandler.DoMsgHandler(&req)
+		}
 		//执行注册的路由方法
 		//go func(req ziface.IRequest) {
 		//	conn.Router.PreHandle(req)
@@ -88,7 +93,7 @@ func (conn *Connection) StartReader() {
 
 		//Call the HandleHandle API of the current link binding
 		//Find the corresponding processing business execution according to the bound msgId
-		go conn.MsgHandler.DoMsgHandler(&req)
+		//go conn.MsgHandler.DoMsgHandler(&req)
 
 		//if err := conn.HandleApi(conn.Conn, buf, n); err != nil {
 		//	fmt.Println("connId ", conn.ConnId, "HandleApi error: ", err)
