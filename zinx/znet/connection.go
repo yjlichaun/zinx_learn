@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"zinx/utils"
 	"zinx/ziface"
 )
@@ -23,18 +24,28 @@ type Connection struct {
 	MsgHandler ziface.IMsgHandler
 	//Unbuffered channel for message communication between reads and writes, goroutines
 	MsgChan chan []byte
+	//this conn is belong to which server
+	TcpServer ziface.IServer
+	//connection Property map
+	property map[string]interface{}
+	//protect connection property Lock
+	propertyLock sync.RWMutex
 }
 
 // NewConnection 初始化链接模块的方法
-func NewConnection(conn *net.TCPConn, connId uint32, msgHandler ziface.IMsgHandler) *Connection {
-	return &Connection{
+func NewConnection(server ziface.IServer, conn *net.TCPConn, connId uint32, msgHandler ziface.IMsgHandler) *Connection {
+	c := &Connection{
 		Conn:       conn,
 		ConnId:     connId,
 		ConnStatus: false,
 		MsgHandler: msgHandler,
 		ExitChan:   make(chan bool, 1),
 		MsgChan:    make(chan []byte),
+		TcpServer:  server,
+		property:   make(map[string]interface{}),
 	}
+	c.TcpServer.GetConnMgr().AddConn(c)
+	return c
 }
 
 // StartReader 链接的读业务方法
@@ -151,6 +162,8 @@ func (conn *Connection) Start() {
 	go conn.StartReader()
 	//TODO: 启动当前链接的写数据业务
 	go conn.StartWriter()
+	//
+	conn.TcpServer.CallOnConnStart(conn)
 }
 func (conn *Connection) Stop() {
 	fmt.Println("conn stop() .. ConnId: ", conn.ConnId)
@@ -158,13 +171,17 @@ func (conn *Connection) Stop() {
 		return
 	}
 	conn.ConnStatus = true
+	conn.TcpServer.CallOnConnStop(conn)
 	//关闭链接
 	conn.Conn.Close()
 	//send Writer exit
 	conn.ExitChan <- true
+	//delete conn from connMgr
+	conn.TcpServer.GetConnMgr().DeleteConn(conn)
 	//关闭管道
 	close(conn.ExitChan)
 	close(conn.MsgChan)
+
 }
 func (conn *Connection) GetTcpConnection() *net.TCPConn {
 	return conn.Conn
@@ -174,4 +191,28 @@ func (conn *Connection) GetConnID() uint32 {
 }
 func (conn *Connection) GetRemoteAddr() net.Addr {
 	return conn.Conn.RemoteAddr()
+}
+
+//SetProperty set connection property
+func (conn *Connection) SetProperty(key string, value interface{}) {
+	conn.propertyLock.Lock()
+	defer conn.propertyLock.Unlock()
+	conn.property[key] = value
+}
+
+//GetProperty Get connection property
+func (conn *Connection) GetProperty(key string) (interface{}, error) {
+	conn.propertyLock.RLock()
+	defer conn.propertyLock.RUnlock()
+	if value, ok := conn.property[key]; ok {
+		return value, nil
+	}
+	return nil, errors.New("property not found")
+}
+
+//RemoveProperty remove connection property
+func (conn *Connection) RemoveProperty(key string) {
+	conn.propertyLock.Lock()
+	defer conn.propertyLock.Unlock()
+	delete(conn.property, key)
 }

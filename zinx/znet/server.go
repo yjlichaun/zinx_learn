@@ -18,6 +18,12 @@ type Server struct {
 	Port int
 	//The current server message management module is used to bind msgID and the corresponding processing business API relationship
 	MsgHandler ziface.IMsgHandler
+	//connect manager
+	ConnMgr ziface.IConnManager
+	//After Server create execute hook function --OnConnStart
+	OnConnStart func(conn ziface.IConnection)
+	//Before Server close execute hook function --OnConnClose
+	OnConnClose func(conn ziface.IConnection)
 }
 
 //CallBackToClient 定义当前客户端链接所绑定的handle api (目前是写死的，后期应该优化有用户自定的handle方法)
@@ -37,6 +43,7 @@ func NewServer(name string) ziface.IServer {
 		IP:         utils.GlobalObject.Host,
 		Port:       utils.GlobalObject.TcpPort,
 		MsgHandler: NewMsgHandler(),
+		ConnMgr:    NewConnManager(),
 	}
 }
 func (s *Server) Start() {
@@ -73,8 +80,15 @@ func (s *Server) Start() {
 				fmt.Println("accept tcp error :", err)
 				continue
 			}
+			//set maxConn count if over maxConn ,close connection
+			if s.ConnMgr.GetConnNum() >= utils.GlobalObject.MaxConn {
+				//TODO :give an error package that over maxConn to the client
+				fmt.Println("=========>Too many connections, maxConn = ", utils.GlobalObject.MaxConn)
+				conn.Close()
+				continue
+			}
 			//绑定链接和业务，得到连接模块
-			dealConn := NewConnection(conn, connId, s.MsgHandler)
+			dealConn := NewConnection(s, conn, connId, s.MsgHandler)
 			connId++
 			//启动当前链接处理业务
 			go dealConn.Start()
@@ -85,6 +99,9 @@ func (s *Server) Start() {
 }
 func (s *Server) Stop() {
 	// TODO 将一些服务器的资源、状态或者一些已经开辟的链接信息，进行停止或者回收
+	//Stop or recycle the resources, status, or links that have been opened up by some servers
+	fmt.Println("[stop] Server Listener at Ip :", s.IP+", port :", s.Port, "name :", s.Name)
+	s.ConnMgr.CleanAllConn()
 }
 func (s *Server) Serve() {
 	//启动server的服务功能
@@ -100,4 +117,33 @@ func (s *Server) Serve() {
 func (s *Server) AddRouter(msgId uint32, route ziface.IRouter) {
 	s.MsgHandler.AddRouter(msgId, route)
 	fmt.Println("add router success !!!")
+}
+func (s *Server) GetConnMgr() ziface.IConnManager {
+	return s.ConnMgr
+}
+
+//SetOnConnStart :func to register OnConnStart hook function
+func (s *Server) SetOnConnStart(hookFunc func(conn ziface.IConnection)) {
+	s.OnConnStart = hookFunc
+}
+
+//SetOnConnStop :func to register OnConnStop hook function
+func (s *Server) SetOnConnStop(hookFunc func(conn ziface.IConnection)) {
+	s.OnConnClose = hookFunc
+}
+
+//CallOnConnStart func to execute OnConnStart hook function
+func (s *Server) CallOnConnStart(conn ziface.IConnection) {
+	if s.OnConnStart != nil {
+		fmt.Println("[Conn Handle] CallOnConnStart...")
+		s.OnConnStart(conn)
+	}
+}
+
+//CallOnConnStop func to execute OnConnStop hook function
+func (s *Server) CallOnConnStop(conn ziface.IConnection) {
+	if s.OnConnClose != nil {
+		fmt.Println("[Conn Handle] CallOnConnStop...")
+		s.OnConnClose(conn)
+	}
 }

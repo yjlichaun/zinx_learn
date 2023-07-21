@@ -50,8 +50,24 @@ func (p *HelloZinxRouter) Handle(req ziface.IRequest) {
 //	}
 //}
 
+//DoConnectionBegin :after create connection execute hook function
+func DoConnectionBegin(conn ziface.IConnection) {
+	fmt.Println("==========>DoConnectionBegin is Called...")
+	if err := conn.SendMsg(202, []byte("do connection begin... \n")); err != nil {
+		fmt.Println("do connection begin error", err)
+	}
+}
+
+//DoConnectionPost :before conn down execute hook function
+func DoConnectionPost(conn ziface.IConnection) {
+	fmt.Println("==========>DoConnectionPost is Called...")
+	fmt.Println("conn ID = ", conn.GetConnID(), "is Lost...")
+}
 func main() {
 	z := znet.NewServer("[demoServer]")
+	//register conn hook function
+	z.SetOnConnStart(DoConnectionBegin)
+	z.SetOnConnStop(DoConnectionPost)
 	//给当前框架添加router
 	z.AddRouter(0, &PingRouter{})
 	z.AddRouter(1, &HelloZinxRouter{})
